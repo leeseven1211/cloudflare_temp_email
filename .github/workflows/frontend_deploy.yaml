@@ -1,7 +1,6 @@
 name: Deploy Frontend
 
 on:
-  workflow_dispatch:
   workflow_run:
     workflows: [Upstream Sync]
     types: [completed]
@@ -13,7 +12,6 @@ on:
 jobs:
   deploy-frontend:
     runs-on: ubuntu-latest
-  workflow_dispatch:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -22,13 +20,11 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
-  workflow_dispatch:
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
           version: 10
-  workflow_dispatch:
           run_install: false
 
       - name: Deploy Frontend for ${{ github.ref_name }}
@@ -53,7 +49,6 @@ jobs:
 
   deploy-telegram-frontend:
     runs-on: ubuntu-latest
-  workflow_dispatch:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -62,13 +57,11 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
-  workflow_dispatch:
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
           version: 10
-  workflow_dispatch:
           run_install: false
 
       - name: Deploy Telegram Frontend for ${{ github.ref_name }}
