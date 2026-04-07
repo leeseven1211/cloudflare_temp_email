@@ -26,6 +26,24 @@ const API_PATHS = [
 	"/external/",
 ];
 
+const FRONTEND_PRIMARY_HOST = "mail.leeseven.com";
+const API_PRIMARY_HOST = "mail-api.leeseven.com";
+const LEGACY_FRONTEND_HOSTS = new Set([
+	"temp-email.leeseven.online",
+	"cloudflare-temp-email-web-1cd.pages.dev",
+]);
+const LEGACY_API_HOSTS = new Set([
+	"temp-email-api.leeseven.online",
+	"cloudflare-temp-email.leeseven-tempmail.workers.dev",
+]);
+
+const buildRedirectUrl = (url: URL, host: string): URL => {
+	const target = new URL(url.toString());
+	target.protocol = "https:";
+	target.host = host;
+	return target;
+};
+
 const app = new Hono<HonoCustomType>()
 //cors
 app.use('/*', cors());
@@ -37,13 +55,31 @@ app.onError((err, c) => {
 // global middlewares
 app.use('/*', async (c, next) => {
 
-	// check if the request is for static files
-	if (c.env.ASSETS && !API_PATHS.some(path => c.req.path.startsWith(path))) {
-		const url = new URL(c.req.raw.url);
-		if (!url.pathname.includes('.')) {
-			url.pathname = ""
+	const requestUrl = new URL(c.req.raw.url);
+	const requestHost = requestUrl.hostname;
+	const isApiPath = API_PATHS.some(path => c.req.path.startsWith(path));
+
+	if (LEGACY_FRONTEND_HOSTS.has(requestHost) && !isApiPath) {
+		return Response.redirect(buildRedirectUrl(requestUrl, FRONTEND_PRIMARY_HOST).toString(), 308);
+	}
+
+	if (LEGACY_API_HOSTS.has(requestHost)) {
+		return Response.redirect(buildRedirectUrl(requestUrl, API_PRIMARY_HOST).toString(), 308);
+	}
+
+	if (requestHost === API_PRIMARY_HOST) {
+		const token = c.req.raw.headers.get("x-api-token") || requestUrl.searchParams.get("token");
+		if (!c.env.INTERNAL_API_TOKEN || token !== c.env.INTERNAL_API_TOKEN) {
+			return c.text("Unauthorized", 401);
 		}
-		return c.env.ASSETS.fetch(url);
+	}
+
+	// check if the request is for static files
+	if (c.env.ASSETS && !isApiPath) {
+		if (!requestUrl.pathname.includes('.')) {
+			requestUrl.pathname = ""
+		}
+		return c.env.ASSETS.fetch(requestUrl);
 	}
 
 	// save language in context

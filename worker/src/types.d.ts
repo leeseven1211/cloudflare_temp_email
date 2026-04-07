@@ -34,6 +34,7 @@ type Bindings = {
     USER_ROLES: string | UserRole[] | undefined
     DOMAIN_LABELS: string | string[] | undefined
     PASSWORDS: string | string[] | undefined
+    INTERNAL_API_TOKEN: string | undefined
     ADMIN_PASSWORDS: string | string[] | undefined
     DISABLE_ADMIN_PASSWORD_CHECK: string | boolean | undefined
     JWT_SECRET: string
