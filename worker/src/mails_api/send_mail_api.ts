@@ -117,6 +117,56 @@ const sendMailBySmtp = async (
     )
 }
 
+const sendMailByMailChannels = async (
+    c: Context<HonoCustomType>, address: string,
+    reqJson: {
+        from_name: string, to_mail: string, to_name: string,
+        subject: string, content: string, is_html: boolean
+    }
+): Promise<void> => {
+    const payload = {
+        personalizations: [
+            {
+                to: [
+                    reqJson.to_name ? {
+                        email: reqJson.to_mail,
+                        name: reqJson.to_name,
+                    } : {
+                        email: reqJson.to_mail,
+                    }
+                ]
+            }
+        ],
+        from: reqJson.from_name ? {
+            email: address,
+            name: reqJson.from_name,
+        } : {
+            email: address,
+        },
+        subject: reqJson.subject,
+        content: [
+            {
+                type: reqJson.is_html ? 'text/html' : 'text/plain',
+                value: reqJson.content,
+            }
+        ],
+    };
+    const res = await fetch('https://api.mailchannels.net/tx/v1/send', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+        throw new Error(`MailChannels error: ${res.status} ${text}`);
+    }
+    if (text) {
+        console.log(`MailChannels success: ${text}`);
+    }
+}
+
 export const sendMail = async (
     c: Context<HonoCustomType>, address: string,
     reqJson: {
@@ -201,6 +251,10 @@ export const sendMail = async (
     }
     else if (smtpConfig) {
         await sendMailBySmtp(c, address, reqJson, smtpConfig);
+    }
+    // Local fork fallback: allow arbitrary recipients for leeseven.online via MailChannels
+    else if (mailDomain === 'leeseven.online') {
+        await sendMailByMailChannels(c, address, reqJson);
     }
     else {
         if (c.env.SEND_MAIL) {
