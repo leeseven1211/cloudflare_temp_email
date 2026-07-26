@@ -192,7 +192,6 @@ test.describe('IP Whitelist Settings', () => {
     expect(saveRes.status()).toBe(400);
   });
 });
-
 test.describe('IP Whitelist Runtime Behavior', () => {
   test('whitelist with empty list allows requests (protection mode)', async ({ request }) => {
     // Enable whitelist with empty list
@@ -271,4 +270,3 @@ test.describe('IP Whitelist Runtime Behavior', () => {
     });
   });
 });
-
