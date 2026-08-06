@@ -10,6 +10,7 @@ import { api as userApi } from './user_api';
 import { api as adminApi } from './admin_api';
 import { api as apiSendMail } from './mails_api/send_mail_api'
 import { api as telegramApi } from './telegram_api'
+import { api as deactivationSignalApi } from './external_api/deactivation_signal'
 
 import i18n from './i18n';
 import { email } from './email';
@@ -296,6 +297,7 @@ app.route('/', userApi)
 app.route('/', adminApi)
 app.route('/', apiSendMail)
 app.route('/', telegramApi)
+app.route('/', deactivationSignalApi)
 
 const health_check = async (c: Context<HonoCustomType>) => {
 	const lang = c.req.raw.headers.get("x-lang") || c.env.DEFAULT_LANG;
