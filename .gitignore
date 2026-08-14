@@ -142,3 +142,9 @@ pnpm-lock.yaml
 e2e/test-results/
 e2e/playwright-report/
 e2e/.e2e-pids
+
+# 编辑前的备份副本，只在机器上保留
+*.bak
+*.bak-*
+*.bak.*
+*.orig
