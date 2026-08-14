@@ -196,3 +196,76 @@ nslookup -qt="mx" a.b.com 1.1.1.1
 ## 加入社区
 
 - [Telegram](https://t.me/cloudflare_temp_email)
+
+## 部署与运维（OpenClaw 归档）
+
+> Archived from OpenClAW memory (2026-08-14)
+
+# temp-email / 临时邮箱服务
+
+> 最后整理：2026-07-02
+> 角色：当前架构、入口、凭据位置与运维口径。历史迁移过程已归档到 memory/archive/2026-07/memory-cleanup-20260702/temp-email.md。
+
+## 当前入口
+- Web：https://mail.leeseven.com
+- API：https://mail-api.leeseven.com
+- 原始协议入口：smtp.leeseven.com、imap.leeseven.com（DNS only，原始邮件协议，不走 Cloudflare 橙云 Web 口径）
+- 统一认证：mail.leeseven.com 入口前置 leeseven-auth。
+- 运维口径：这是老板仍在使用的服务，后续上游同步、清理或部署决策中必须保留现网能力和私有兼容 API，不要按“可丢弃/可恢复成纯上游原版”处理。
+
+## 当前架构
+- Web/API 收口在 Cloudflare Pages/Worker 与主 Oracle VPS nginx 入口之间协作。
+- 外发 SMTP 当前稳定口径：Oracle Email Delivery，sender notify@leeseven.online，Phoenix 587 + STARTTLS。
+- 入站通知邮箱：notify@leeseven.online 通过 Cloudflare Email Routing 转发到 Gmail。
+- 若第三方服务只需要外发 SMTP、且不和当前主机同机，优先直连 Oracle SMTP；不要混用 temp-email 的 jwt 代理口径。
+
+## 关键运维点
+- temp-email 发信开关：mail-api.leeseven.com/open_api/settings 中 enableSendMail=true 才算业务可发信。
+- 主机防火墙必须允许邮件代理所需 143/587；历史上出现过服务监听正常但 INPUT 末尾 reject 拦住外部 TCP 的情况。
+- smtp.leeseven.com / imap.leeseven.com 属于原始协议入口，不能套 Cloudflare 橙云。
+- Cloudflare DNS 恢复清单以 configs/cloudflare-dns-records.txt 为准。
+- 服务纳管与备份恢复以 configs/services/*.json、docs/service-catalog.md 和恢复模块为准；不以本文件手抄路径作为唯一事实源。
+
+## 凭据位置索引（不在正文写密钥）
+- Oracle Email Delivery SMTP：见 TOOLS.md 的 “Oracle Email Delivery” 段。
+- Cloudflare：见 TOOLS.md 的 “Cloudflare” 段。
+- 业务 API token / Worker secret：只记录位置，不在聊天或长期正文复述。
+
+## 验证口径
+- Web 入口：未登录应进入统一认证；登录后可到邮箱页面。
+- API 健康：检查 settings 中发信开关与 API 返回。
+- SMTP：必要时发一封测试邮件确认 Gmail 能收到。
+- DNS/端口：确认 smtp/imap 为 DNS only，主机 143/587 外部可达。
+## 外部服务兼容 API（通用）
+
+- **对接文档（公开固定页，无需登录）**：https://mail.leeseven.com/docs/compat-api
+- **对接文档 Markdown**：https://mail.leeseven.com/docs/compat-api.md
+- **本地文档源**：docs/temp-mail-compat-api.md（HTML：docs/temp-mail-compat-api.html）
+- **入口**：https://mail.leeseven.com/compat/temp-mail/v1
+- **定位**：给外部自动化/第三方服务对接临时邮箱的通用兼容层，不绑定具体项目；每个 client 使用独立 x-admin-auth key，可单独吊销。
+- **当前 client map**：root-only Nginx map /etc/nginx/snippets/temp-mail-compat-clients.map；首个 client 为 grok-register。
+- **client key 存放**：~/.openclaw/credentials/temp-mail-compat/<client>.key，不要写进聊天或仓库。
+- Email Butler 使用独立 client `email-butler` 创建固定 CF 邮箱；Key 位于 `~/.openclaw/credentials/temp-mail-compat/email-butler.key`，由 Butler 服务端读取，页面与业务客户端不可见。
+- **Nginx 配置**：/etc/nginx/conf.d/temp-mail-compat.conf 定义 $http_x_admin_auth -> $temp_mail_compat_client 映射；/etc/nginx/sites-available/mail.leeseven.com 的 /compat/temp-mail/v1/* locations 自动补 mail-proxy-secrets.conf 内部头后转发到 Worker。
+- **安全模型**：创建邮箱/域名列表需要 client key；读取邮件不需要 client key，但必须使用创建邮箱返回的 Authorization: Bearer <address_jwt>，权限仍按单邮箱 JWT 隔离。
+- **开放路径**：
+  - GET /health：健康检查
+  - POST /admin/new_address：创建邮箱，需 x-admin-auth
+  - GET /api/domains：域名列表，需 x-admin-auth
+  - GET /api/mails：邮件列表，需 address JWT
+  - GET /api/mail/{id} / /api/mails/{id}：邮件详情，需 address JWT
+- **grok-register 配置建议**：cloudflare_api_base=https://mail.leeseven.com/compat/temp-mail/v1，cloudflare_auth_mode=x-admin-auth，cloudflare_path_accounts=/admin/new_address，cloudflare_path_messages=/api/mails，defaultDomains=leesevenshop.com。
+
+## OpenAI 封号邮件信号（2026-08-06）
+
+- Worker fork 的生产分支为 `deploy/leeseven`；提交 `6fde735` 增加 `POST /external/api/signals/scan`。
+- 请求仅含精确邮箱与回看天数；Worker 在 D1 内精确匹配收件地址、OpenAI 官方发件域和高置信封号/违规/申诉组合文本。
+- 响应只含 detected、confidence、checked_at、received_at、subject、sender、message_id，不返回 raw/text/html 或邮箱凭据。
+- **验收**：2026-07-07 已通过 Nginx 语法检查、reload、未授权创建返回 401、授权创建 @leesevenshop.com 地址并用返回 JWT 拉取邮件列表。
+
+## 可选邮箱域名（2026-07-30）
+- Worker 现网 DOMAINS / DEFAULT_DOMAINS / RANDOM_SUBDOMAIN_DOMAINS：leeseven.online、leesevenshop.com、leeseven.com
+- leeseven.com 已配置 Email Routing catch-all → Worker cloudflare-temp-email
+- leeseven.com apex + *.leeseven.com MX → Cloudflare Email Routing；并补 SPF include:_spf.mx.cloudflare.net
+- 本地源：/home/ubuntu/projects/cloudflare_temp_email/worker/wrangler.toml 已同步三域
+- 对外 settings 已验证三域可见（mail-api /open_api/settings）
