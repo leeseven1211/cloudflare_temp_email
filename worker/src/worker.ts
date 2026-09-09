@@ -10,6 +10,7 @@ import { api as userApi } from './user_api';
 import { api as adminApi } from './admin_api';
 import { api as apiSendMail } from './mails_api/send_mail_api'
 import { api as telegramApi } from './telegram_api'
+import { api as emailButlerApi } from './integrations/email_butler'
 import { api as deactivationSignalApi } from './external_api/deactivation_signal'
 
 import i18n from './i18n';
@@ -183,7 +184,10 @@ const checkoutUserRolePayload = async (
 
 // api auth
 app.use('/api/*', async (c, next) => {
-	if (c.req.path.startsWith("/api/new_address")) {
+	if (
+		c.req.path.startsWith("/api/new_address")
+		|| c.req.path.startsWith("/api/integrations/email-butler/addresses")
+	) {
 		await checkUserPayload(c);
 		await next();
 		return;
@@ -297,6 +301,7 @@ app.route('/', userApi)
 app.route('/', adminApi)
 app.route('/', apiSendMail)
 app.route('/', telegramApi)
+app.route('/', emailButlerApi)
 app.route('/', deactivationSignalApi)
 
 const health_check = async (c: Context<HonoCustomType>) => {
